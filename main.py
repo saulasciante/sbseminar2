@@ -1,17 +1,25 @@
 import cv2.cv2 as cv
 import numpy as np
 import os
+from statistics import mean
 
 RECTANGLE_WIDTH = 2
 
-left_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_leftear.xml')
-right_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_rightear.xml')
 
-# imageWithMask = cv.cvtColor(cv.imread('AWEForSegmentation/testannot_rect/0001.png'), cv.COLOR_BGR2GRAY)
+def detectionAccuracy(maskDetected, maskCorrect):
+    blended = cv.addWeighted(maskDetected, 0.5, maskCorrect, 0.5, 0.0)
+    blendedGrey = cv.cvtColor(blended, cv.COLOR_BGR2GRAY)
 
-def accuracy():
-    # idea merge two pictures together and look colors
-    pass
+    intersection = np.sum(blendedGrey == 203)
+    union = np.sum(blendedGrey == 128) + np.sum(blendedGrey == 75) + intersection
+    accuracy = round(intersection/union, 3)
+
+    # if accuracy > 0.8:
+    #     cv.imshow('blended', blendedGrey)
+    #     cv.waitKey(0)
+
+    return accuracy
+
 
 def maskCoordinates(image):
     mask = np.array(np.where(np.array(image) == 255))
@@ -20,26 +28,42 @@ def maskCoordinates(image):
     return firstWhitePixel[0], firstWhitePixel[1], lastWhitePixel[0], lastWhitePixel[1]
 
 
-imageDirectory = 'AWEForSegmentation/test'
-
-for imageFilename in os.listdir(imageDirectory):
-    testImage = cv.imread(imageDirectory + '/' + imageFilename)
+def detectEars(testImage):
+    height, width, channels = testImage.shape
     testImageGray = cv.cvtColor(testImage, cv.COLOR_BGR2GRAY)
 
-    left_ears = left_ear_cascade.detectMultiScale(testImageGray, 1.05, 4)
-    right_ears = right_ear_cascade.detectMultiScale(testImageGray, 1.05, 4)
+    left_ears = left_ear_cascade.detectMultiScale(testImageGray, 1.05, 3)
+    right_ears = right_ear_cascade.detectMultiScale(testImageGray, 1.05, 3)
+
+    maskDetected = np.zeros(shape=[height, width, channels], dtype=np.uint8)
 
     for (x, y, w, h) in left_ears:
-        img = cv.rectangle(testImage, (x, y), (x+w, y+h), (255, 0, 0), RECTANGLE_WIDTH)
-        roi_gray = testImageGray[y:y+h, x:x+w]
-        roi_color = img[y:y+h, x:x+w]
+        maskDetected = cv.rectangle(maskDetected, (x, y), (x + w, y + h), (0, 255, 0), -1)
 
     for (x, y, w, h) in right_ears:
-        img = cv.rectangle(testImage, (x, y), (x+w, y+h), (0, 255, 0), RECTANGLE_WIDTH)
-        roi_gray = testImageGray[y:y+h, x:x+w]
-        roi_color = img[y:y+h, x:x+w]
+        maskDetected = cv.rectangle(maskDetected, (x, y), (x + w, y + h), (0, 255, 0), -1)
 
-    cv.imshow('img', testImage)
-    cv.waitKey(0)
+    return maskDetected
 
-cv.destroyAllWindows()
+
+if __name__ == '__main__':
+    left_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_leftear.xml')
+    right_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_rightear.xml')
+    testImageDir = 'AWEForSegmentation/train/'
+    maskImageDir = 'AWEForSegmentation/trainannot_rect/'
+    testImageFilenames = sorted(os.listdir(testImageDir))
+    accuracies = []
+
+    for filename in testImageFilenames:
+        testImage = cv.imread(testImageDir + filename)
+
+        try:
+            maskDetected = detectEars(testImage)
+            maskCorrect = cv.imread(maskImageDir + filename)
+            accuracy = detectionAccuracy(maskDetected, maskCorrect)
+            accuracies.append(accuracy)
+            print(filename, accuracy)
+        except:
+            print(f'There was an exception during detecting ears in file {filename}')
+
+    print(f'Average detection accuracy: {mean(accuracies)}')
