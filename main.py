@@ -5,6 +5,9 @@ from statistics import mean
 
 RECTANGLE_WIDTH = 2
 
+left_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_leftear.xml')
+right_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_rightear.xml')
+
 
 def detectionAccuracy(maskDetected, maskCorrect):
     blended = cv.addWeighted(maskDetected, 0.5, maskCorrect, 0.5, 0.0)
@@ -14,9 +17,9 @@ def detectionAccuracy(maskDetected, maskCorrect):
     union = np.sum(blendedGrey == 128) + np.sum(blendedGrey == 75) + intersection
     accuracy = round(intersection/union, 3)
 
-    # if accuracy > 0.8:
-    #     cv.imshow('blended', blendedGrey)
-    #     cv.waitKey(0)
+    # cv.imshow('blended', blendedGrey)
+    # cv.waitKey(0)
+    # print(accuracy)
 
     return accuracy
 
@@ -28,12 +31,12 @@ def maskCoordinates(image):
     return firstWhitePixel[0], firstWhitePixel[1], lastWhitePixel[0], lastWhitePixel[1]
 
 
-def detectEars(testImage):
+def detectEars(testImage, scale, neighbours):
     height, width, channels = testImage.shape
     testImageGray = cv.cvtColor(testImage, cv.COLOR_BGR2GRAY)
 
-    left_ears = left_ear_cascade.detectMultiScale(testImageGray, 1.05, 3)
-    right_ears = right_ear_cascade.detectMultiScale(testImageGray, 1.05, 3)
+    left_ears = left_ear_cascade.detectMultiScale(testImageGray, scale, neighbours)
+    right_ears = right_ear_cascade.detectMultiScale(testImageGray, scale, neighbours)
 
     maskDetected = np.zeros(shape=[height, width, channels], dtype=np.uint8)
 
@@ -47,23 +50,26 @@ def detectEars(testImage):
 
 
 if __name__ == '__main__':
-    left_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_leftear.xml')
-    right_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_rightear.xml')
-    testImageDir = 'AWEForSegmentation/train/'
-    maskImageDir = 'AWEForSegmentation/trainannot_rect/'
+    testImageDir = 'AWEForSegmentation/test/'
+    maskImageDir = 'AWEForSegmentation/testannot_rect/'
+
     testImageFilenames = sorted(os.listdir(testImageDir))
-    accuracies = []
 
-    for filename in testImageFilenames:
-        testImage = cv.imread(testImageDir + filename)
+    for scale in np.arange(1.01, 1.5, 0.05):
+        for neighbours in range(1, 6, 1):
+            accuracies = []
 
-        try:
-            maskDetected = detectEars(testImage)
-            maskCorrect = cv.imread(maskImageDir + filename)
-            accuracy = detectionAccuracy(maskDetected, maskCorrect)
-            accuracies.append(accuracy)
-            print(filename, accuracy)
-        except:
-            print(f'There was an exception during detecting ears in file {filename}')
+            for filename in testImageFilenames:
+                testImage = cv.imread(testImageDir + filename)
 
-    print(f'Average detection accuracy: {mean(accuracies)}')
+                try:
+                    maskDetected = detectEars(testImage, scale, neighbours)
+                    maskCorrect = cv.imread(maskImageDir + filename)
+                    accuracy = detectionAccuracy(maskDetected, maskCorrect)
+                    accuracies.append(accuracy)
+                    # print(filename, accuracy)
+                except:
+                    print(f'There was an exception during detecting ears in file {filename}')
+
+            print(f'Average detection accuracy: {mean(accuracies)} with scale {scale} and neighbours {neighbours}')
+        print()
