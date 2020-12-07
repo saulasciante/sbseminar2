@@ -3,8 +3,6 @@ import numpy as np
 import os
 from statistics import mean
 
-RECTANGLE_WIDTH = 2
-
 left_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_leftear.xml')
 right_ear_cascade = cv.CascadeClassifier('haarcascade_mcs_rightear.xml')
 
